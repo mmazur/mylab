@@ -1,0 +1,214 @@
+---
+
+- name: Disable ssh keys for user 'debian'
+  file:
+    path: /home/debian/.ssh/authorized_keys
+    state: absent
+  register: debianrmkeys
+
+- name: Lock user 'debian'
+  when: debianrmkeys.changed
+  command: /usr/bin/passwd --lock debian
+
+- name: Disable sudo for user 'debian'
+  file:
+    path: /etc/sudoers.d/debian-cloud-init
+    state: absent
+
+- name: assume dev system, set PS1 to green
+  copy:
+    content: 'export PS1="[\[\e[34;42m\]\u\[\e[m\]@\[\e[34;42m\]\h\[\e[m\] \W]\[\e[34;42m\]\\$\[\e[m\] "'
+    dest: /etc/profile.d/devPS1.sh
+    owner: root
+    group: root
+    mode: 0755
+
+# https://github.com/ansible/ansible/issues/25543
+- name: install dbus
+  apt:
+    name: dbus
+    state: present
+
+- name: Set hostname
+  tags: etc
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Override DHCP host and domain name
+  tags: etc
+  template:
+    src: etc/dhcp/dhclient.conf
+    dest: /etc/dhcp/dhclient.conf
+  notify: restart networking
+
+- name: Enable metrics for DHCP classless routes
+  tags: etc
+  copy:
+    src: files/etc/dhcp/dhclient-exit-hooks.d/rfc3442-classless-routes
+    dest: /etc/dhcp/dhclient-exit-hooks.d/rfc3442-classless-routes
+    owner: root
+    group: root
+    mode: 0644
+  notify: restart networking
+
+- name: check for etc/network/interfaces
+  tags: etc
+  local_action: stat path={{ role_path }}/files/etc/network/interfaces.{{ inventory_hostname }}
+  register: local_etc_network_interfaces
+  ignore_errors: True
+
+- name: Set default network interfaces
+  when: not local_etc_network_interfaces.stat.exists
+  tags: etc
+  copy:
+    src: "files/etc/network/interfaces"
+    dest: /etc/network/interfaces
+    owner: root
+    group: root
+    mode: 0644
+  notify: restart networking
+
+- name: Set vm-specific network interfaces
+  when: local_etc_network_interfaces.stat.exists
+  tags: etc
+  copy:
+    src: "files/etc/network/interfaces.{{ inventory_hostname }}"
+    dest: /etc/network/interfaces
+    owner: root
+    group: root
+    mode: 0644
+  notify: restart networking
+
+- name: Check if /etc/cloud exists
+  tags: etc, cloud-init
+  stat:
+    path: /etc/cloud
+  register: etc_cloud
+
+- name: Disable cloud-init part 1
+  tags: etc, cloud-init
+  when: etc_cloud.stat.exists
+  copy:
+    content: ""
+    dest: /etc/cloud/cloud-init.disabled
+    force: yes
+
+- name: Disable cloud-init part 2 (disable services)
+  when: ansible_distribution_major_version == "8"
+  tags: etc, cloud-init
+  service:
+    name: cloud-config
+    enabled: no
+
+- name: Disable cloud-init part 3 (disable services)
+  when: ansible_distribution_major_version == "8"
+  tags: etc, cloud-init
+  service:
+    name: cloud-final
+    enabled: no
+
+- name: Disable cloud-init part 4 (disable services)
+  when: ansible_distribution_major_version == "8"
+  tags: etc, cloud-init
+  service:
+    name: cloud-init
+    enabled: no
+
+- name: Disable cloud-init part 5 (disable services)
+  when: ansible_distribution_major_version == "8"
+  tags: etc, cloud-init
+  service:
+    name: cloud-init-local
+    enabled: no
+
+- name: Output grub to serial console as well (1/5)
+  when: ansible_distribution_major_version >= "9"
+  tags: etc, grub
+  lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_TERMINAL='
+    state: absent
+  notify: update grub
+
+- name: Output grub to serial console as well (2/5)
+  when: ansible_distribution_major_version >= "9"
+  tags: etc, grub
+  lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_TERMINAL_INPUT='
+    line: 'GRUB_TERMINAL_INPUT="console serial"'
+  notify: update grub
+
+- name: Output grub to serial console as well (3/5)
+  when: ansible_distribution_major_version >= "9"
+  tags: etc, grub
+  lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_TERMINAL_OUTPUT='
+    line: 'GRUB_TERMINAL_OUTPUT="console serial"'
+  notify: update grub
+
+- name: Output grub to serial console as well (4/5)
+  when: ansible_distribution_major_version >= "9"
+  tags: etc, grub
+  lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_SERIAL_COMMAND='
+    line: 'GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"'
+  notify: update grub
+
+- name: Output grub to serial console as well (4/5)
+  when: ansible_distribution_major_version >= "9"
+  tags: etc, grub
+  lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_TIMEOUT='
+    line: 'GRUB_TIMEOUT=0'
+  notify: update grub
+
+- name: Install molly-guard
+  tags: apt
+  apt:
+    name: molly-guard
+    state: present
+
+- name: Configure molly-guard
+  tags: apt, etc
+  lineinfile:
+    path: /etc/molly-guard/rc
+    regexp: '^[ #]*ALWAYS_QUERY_HOSTNAME='
+    line: 'ALWAYS_QUERY_HOSTNAME=true'
+
+# Let's use systemd-timesyncd everywhere
+- name: uninstall ntpd
+  tags: apt, time
+  apt:
+    name: ntp
+    state: absent
+
+- name: make permanent journal directory
+  tags: journal
+  file:
+    path: /var/log/journal
+    state: directory
+    owner: root
+    group: systemd-journal
+    mode: 02755
+  notify: flush journal
+
+- name: uninstall rsyslog
+  tags: apt, journal
+  apt:
+    name: rsyslog
+    state: absent
+
+- name: copy a more useful default vim config
+  tags: etc
+  copy:
+    src: files/etc/vim/vimrc.local
+    dest: /etc/vim/vimrc.local
+    owner: root
+    group: root
+    mode: 0644
+
+# vi: sts=2 sw=2 et

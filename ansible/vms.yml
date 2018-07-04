@@ -1,0 +1,6 @@
+- hosts: all
+  tags: common
+  roles:
+    - common
+
+# vi: sts=2 sw=2 et

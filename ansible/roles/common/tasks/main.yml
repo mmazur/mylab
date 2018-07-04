@@ -1,0 +1,52 @@
+---
+
+- name: set keys for root's authorized_keys
+  tags: ssh
+  vars:
+    all_root_ssh_keys: "{{ base_root_ssh_keys + additional_root_ssh_keys }}"
+  authorized_key:
+    user: root
+    state: present
+    exclusive: yes
+    path: "{{ root_authorized_keys_path }}"
+    manage_dir: "{{ manage_root_ssh_directory }}"
+    key: "{{ all_root_ssh_keys|map('extract', ssh_keys)|join('\n') }}"
+
+
+- import_tasks: debian.yml
+  when: ansible_os_family == "Debian"
+  tags: debian
+
+- name: Set timezone
+  tags: time
+  shell: "[ \"$(timedatectl | grep 'Time zone:' | sed -e's/.*Time zone: \\([^ ]*\\).*/\\1/')\" = \"{{ time_zone }}\" ] || ( timedatectl set-timezone \"{{ time_zone }}\" && exit 5 )"
+  register: timedatectl_result
+  failed_when: "timedatectl_result.rc != 0 and timedatectl_result.rc != 5"
+  changed_when: "timedatectl_result.rc == 5"
+
+- name: Configure timesyncd
+  tags: time
+  copy:
+    src: files/etc/systemd/timesyncd.conf
+    dest: /etc/systemd/timesyncd.conf
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Set NTP
+  tags: time
+  shell: "timedatectl | grep -q 'Network time on: yes' || ( timedatectl set-ntp yes && exit 5 )"
+  failed_when: "timedatectl_result.rc != 0 and timedatectl_result.rc != 5"
+  changed_when: "timedatectl_result.rc == 5"
+
+# On debian it could be disabled because ntpd was installed
+- name: Make sure timesyncd is running
+  tags: time
+  systemd: name=systemd-timesyncd.service state=started
+
+# https://github.com/ansible/ansible/issues/22169
+- name: Record the fact 'common' role has been run
+  set_fact:
+    role_common_done: true
+
+# vi: sts=2 sw=2 et

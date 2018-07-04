@@ -1,0 +1,5 @@
+---
+additional_root_ssh_keys: []
+root_authorized_keys_path: '/root/.ssh/authorized_keys'
+manage_root_ssh_directory: True
+

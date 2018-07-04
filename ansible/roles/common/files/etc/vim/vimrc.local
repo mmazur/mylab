@@ -1,0 +1,19 @@
+source /usr/share/vim/vim80/defaults.vim
+
+" This is required, or vim will load defaults.vim again and overwrite some
+" settings; more: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=864074
+let skip_defaults_vim = 1
+
+if has('mouse')
+    set mouse=r
+endif
+
+set fileencodings=utf8
+
+set shiftwidth=4
+set tabstop=4
+set expandtab
+set autoindent
+
+set modeline
+

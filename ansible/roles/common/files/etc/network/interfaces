@@ -1,0 +1,35 @@
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# Primary interface; default route *NEEDS* to go here, since the other
+# interfaces get a lower priority (higher metric)
+auto eth0
+iface eth0 inet dhcp
+
+# Maybe the VM has 2 NICs?
+allow-hotplug eth1
+iface eth1 inet dhcp
+    metric 10
+
+# Maybe the VM has 3 NICs?
+allow-hotplug eth2
+iface eth2 inet dhcp
+    metric 10
+
+# Maybe the VM has 4 NICs?
+allow-hotplug eth3
+iface eth3 inet dhcp
+    metric 10
+
+# Maybe the VM has 5 NICs?
+allow-hotplug eth4
+iface eth4 inet dhcp
+    metric 10
+

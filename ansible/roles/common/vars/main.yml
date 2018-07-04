@@ -1,0 +1,11 @@
+---
+
+time_zone: Europe/Warsaw
+
+base_root_ssh_keys:
+  - mmazur
+
+ssh_keys: {
+  mmazur: "{{ lookup('file', 'roles/common/files/ssh_keys/mmazur.keys') }}",
+  }
+

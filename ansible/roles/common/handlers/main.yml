@@ -1,0 +1,20 @@
+---
+
+- name: newaliases
+  command: newaliases
+
+- name: update grub
+  command: update-grub
+
+- name: flush journal
+  systemd:
+    name: systemd-journal-flush.service
+    enabled: yes
+    state: started
+
+- name: restart networking
+  systemd:
+    name: networking.service
+    state: restarted
+
+# vi: sts=2 sw=2 et
