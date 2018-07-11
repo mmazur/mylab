@@ -12,6 +12,21 @@
     manage_dir: "{{ manage_root_ssh_directory }}"
     key: "{{ all_root_ssh_keys|map('extract', ssh_keys)|join('\n') }}"
 
+- name: Make sure there aren't any previous networkd configs
+  file:
+    path: "/etc/systemd/network/{{ item }}"
+    state: absent
+  with_items:
+    - 99-dhcp.network
+    - 99-vagrant.network
+
+- name: Copy my own network configs
+  copy:
+    src: "files{{ item }}"
+    dest: "{{ item }}"
+  with_items:
+    - /etc/systemd/network/eth0.network
+    - /etc/systemd/network/eth1.network
 
 - import_tasks: debian.yml
   when: ansible_os_family == "Debian"
@@ -43,10 +58,5 @@
 - name: Make sure timesyncd is running
   tags: time
   systemd: name=systemd-timesyncd.service state=started
-
-# https://github.com/ansible/ansible/issues/22169
-- name: Record the fact 'common' role has been run
-  set_fact:
-    role_common_done: true
 
 # vi: sts=2 sw=2 et

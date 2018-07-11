@@ -1,6 +1,6 @@
 - hosts: all
-  tags: common
+  become: yes
   roles:
-    - common
+    - vagrant
 
 # vi: sts=2 sw=2 et

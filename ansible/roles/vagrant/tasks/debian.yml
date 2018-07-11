@@ -1,0 +1,60 @@
+---
+
+- name: assume dev system, set PS1 to green
+  copy:
+    content: 'export PS1="[\[\e[34;42m\]\u\[\e[m\]@\[\e[34;42m\]\h\[\e[m\] \W]\[\e[34;42m\]\\$\[\e[m\] "'
+    dest: /etc/profile.d/devPS1.sh
+    owner: root
+    group: root
+    mode: 0755
+
+- name: Set old iface names
+  tags: etc, grub
+  lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX='
+    line: 'GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"'
+  notify: update grub
+
+# Let's use systemd-timesyncd everywhere
+- name: uninstall ntpd
+  tags: apt, time
+  apt:
+    name: ntp
+    state: absent
+
+#- name: make permanent journal directory
+#  tags: journal
+#  file:
+#    path: /var/log/journal
+#    state: directory
+#    owner: root
+#    group: systemd-journal
+#    mode: 02755
+#  notify: flush journal
+#
+#- name: uninstall rsyslog
+#  tags: apt, journal
+#  apt:
+#    name: rsyslog
+#    state: absent
+
+- name: install the usual tools
+  tags: apt
+  apt:
+    name: "{{ item }}"
+  with_items:
+    - vim
+    - htop
+    - tcpdump
+
+- name: copy a more useful default vim config
+  tags: etc
+  copy:
+    src: files/etc/vim/vimrc.local
+    dest: /etc/vim/vimrc.local
+    owner: root
+    group: root
+    mode: 0644
+
+# vi: sts=2 sw=2 et
